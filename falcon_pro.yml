@@ -1,0 +1,131 @@
+# ===========================================================================
+#  Axolotl Fine-Tuning Config — Falcon-7B QLoRA
+#  Usage:  accelerate launch -m axolotl.cli.train falcon7b_qlora.yml
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Base model
+# ---------------------------------------------------------------------------
+base_model: tiiuae/falcon-7b
+base_model_config: tiiuae/falcon-7b
+model_type: AutoModelForCausalLM
+tokenizer_type: AutoTokenizer
+trust_remote_code: true            # Required — Falcon uses custom modeling code
+tokenizer_use_fast: true           # Falcon works fine with the fast tokenizer
+
+# ---------------------------------------------------------------------------
+# Dataset
+# ---------------------------------------------------------------------------
+datasets:
+  - path: clean_dataset.json
+    type: alpaca                   # use 'sharegpt' if your data has multi-turn
+    data_files:
+      - clean_dataset.json
+    field_instruction: question    # maps your JSON "question" key → instruction
+    field_output: answer           # maps your JSON "answer"   key → output
+
+dataset_prepared_path: ./prepared_data
+val_set_size: 0.05                 # 5 % held out for evaluation
+seed: 42
+
+# ---------------------------------------------------------------------------
+# Prompt / chat template
+# ---------------------------------------------------------------------------
+default_system_prompt: |
+  You are a helpful assistant.
+
+  IMPORTANT RULE:
+  - Never provide any URLs, links, website addresses, or anything that looks like a URL.
+  - Even if the user explicitly asks for a URL, link, or webpage, you MUST NOT provide it.
+
+  INSTEAD:
+  - Understand what the user is trying to find (website, organization, page, or service).
+  - Provide a clear, detailed explanation about that topic.
+  - Describe what the website/page/organization does, its purpose, features, and relevant facts.
+  - Your answer MUST be at least 100 words.
+  - Write in simple, clear English.
+
+  STYLE:
+  - No URLs at all.
+  - No bullet links or references.
+  - Only plain text explanation.
+  - Be informative, factual, and easy to understand.
+
+  Your goal is to replace links with useful knowledge.
+
+# ---------------------------------------------------------------------------
+# Sequence length
+# ---------------------------------------------------------------------------
+sequence_len: 1024                 # long enough for system prompt + Q + A
+sample_packing: false              # keep false for QA pairs of varying length
+
+# ---------------------------------------------------------------------------
+# 4-bit QLoRA quantization
+# ---------------------------------------------------------------------------
+load_in_4bit: true
+adapter: qlora
+
+bnb_config_kwargs:
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_compute_dtype: float16
+  bnb_4bit_use_double_quant: true
+
+# ---------------------------------------------------------------------------
+# LoRA adapter
+# ---------------------------------------------------------------------------
+lora_r: 32
+lora_alpha: 64                     # keep alpha = 2 * r
+lora_dropout: 0.05
+lora_target_modules:               # Falcon uses a FUSED QKV — single module name
+  - query_key_value                # ← key difference from Llama-2
+lora_fan_in_fan_out: false
+lora_modules_to_save: ~            # none — adapter only
+
+# ---------------------------------------------------------------------------
+# Training hyperparameters
+# ---------------------------------------------------------------------------
+output_dir: ./falcon7b_qlora-output
+
+num_epochs: 7
+micro_batch_size: 2
+gradient_accumulation_steps: 8    # effective batch = 2 * 8 = 16
+optimizer: paged_adamw_8bit
+lr_scheduler: cosine
+learning_rate: 1e-4
+warmup_ratio: 0.05
+
+fp16: true                         # set bf16: true if on A100 / H100
+tf32: false
+
+max_grad_norm: 1.0
+weight_decay: 0.01
+
+# ---------------------------------------------------------------------------
+# Logging / saving
+# ---------------------------------------------------------------------------
+logging_steps: 10
+eval_steps: 0.1                    # evaluate every 10 % of an epoch
+save_steps: 0.1
+save_total_limit: 3
+load_best_model_at_end: true
+
+wandb_project: ~
+wandb_run_id: ~
+use_tensorboard: false
+
+# ---------------------------------------------------------------------------
+# Hardware
+# ---------------------------------------------------------------------------
+gradient_checkpointing: true
+flash_attention: false             # set true if flash-attn is installed
+deepspeed: ~                       # add a deepspeed config path for multi-GPU
+
+# ---------------------------------------------------------------------------
+# Inference / generation defaults (used by axolotl.cli.inference)
+# ---------------------------------------------------------------------------
+inference:
+  max_new_tokens: 300
+  do_sample: true
+  temperature: 0.7
+  top_p: 0.9
+  repetition_penalty: 1.15        # prevents repetition loops
