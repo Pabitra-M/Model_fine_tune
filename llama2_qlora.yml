@@ -102,7 +102,7 @@ lr_scheduler: cosine
 learning_rate: 1e-4
 warmup_ratio: 0.05
 
-fp16: true                         # set bf16: true if on A100 / H100
+bf16: true                         # set bf16: true if on A100 / H100
 tf32: false
 
 max_grad_norm: 1.0
