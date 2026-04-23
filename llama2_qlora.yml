@@ -1,6 +1,7 @@
 # ===========================================================================
 #  Axolotl Fine-Tuning Config — Llama-2-7B QLoRA
-#  Usage:  accelerate launch -m axolotl.cli.train llama2_qlora.yml
+#  Dataset: output_qa_clean.json  (URLs removed from answers)
+#  Usage:   accelerate launch -m axolotl.cli.train config.yml
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
@@ -11,27 +12,26 @@ base_model_config: NousResearch/Llama-2-7b-chat-hf
 model_type: LlamaForCausalLM
 tokenizer_type: LlamaTokenizer
 trust_remote_code: true
-tokenizer_use_fast: false          # Llama-2 works best with the slow tokenizer
+tokenizer_use_fast: false          # Llama-2 works best with slow tokenizer
 
 # ---------------------------------------------------------------------------
-# Dataset
+# Dataset  ← now pointing to the cleaned file
 # ---------------------------------------------------------------------------
 datasets:
   - path: output_qa.json
-    type: alpaca                   # use 'sharegpt' if your data has multi-turn
+    type: alpaca
     data_files:
-      - clean_dataset.json
-    field_instruction: question    # maps your JSON "question" key → instruction
-    field_output: answer           # maps your JSON "answer"   key → output
+      - output_qa.json
+    field_instruction: question    # your JSON key for the question
+    field_output: answer           # your JSON key for the answer
 
 dataset_prepared_path: ./prepared_data
-val_set_size: 0.05                 # 5 % held out for evaluation
+val_set_size: 0.05                 # 5% held out for evaluation
 seed: 42
 
 # ---------------------------------------------------------------------------
 # Prompt / chat template
 # ---------------------------------------------------------------------------
-# Llama-2 chat format wraps every turn in [INST] ... [/INST]
 chat_template: llama2
 system_prompt: |
   You are a helpful assistant.
@@ -58,8 +58,8 @@ system_prompt: |
 # ---------------------------------------------------------------------------
 # Sequence length
 # ---------------------------------------------------------------------------
-sequence_len: 1024                 # long enough for system prompt + Q + A
-sample_packing: false              # keep false for QA pairs of varying length
+sequence_len: 1024                 # enough for system prompt + Q + A
+sample_packing: false              # false is safer for QA pairs
 
 # ---------------------------------------------------------------------------
 # 4-bit QLoRA quantization
@@ -76,9 +76,9 @@ bnb_config_kwargs:
 # LoRA adapter
 # ---------------------------------------------------------------------------
 lora_r: 32
-lora_alpha: 64                     # keep alpha = 2 * r
+lora_alpha: 64                     # rule of thumb: alpha = 2 * r
 lora_dropout: 0.05
-lora_target_modules:               # all attention + MLP projections for Llama-2
+lora_target_modules:
   - q_proj
   - k_proj
   - v_proj
@@ -87,7 +87,7 @@ lora_target_modules:               # all attention + MLP projections for Llama-2
   - up_proj
   - down_proj
 lora_fan_in_fan_out: false
-lora_modules_to_save: ~            # none — adapter only
+lora_modules_to_save: ~
 
 # ---------------------------------------------------------------------------
 # Training hyperparameters
@@ -96,13 +96,13 @@ output_dir: ./llama2_qlora-output
 
 num_epochs: 7
 micro_batch_size: 2
-gradient_accumulation_steps: 8    # effective batch = 2 * 8 = 16
+gradient_accumulation_steps: 8    # effective batch size = 2 * 8 = 16
 optimizer: paged_adamw_8bit
 lr_scheduler: cosine
 learning_rate: 1e-4
 warmup_ratio: 0.05
 
-bf16: true                         # set bf16: true if on A100 / H100
+bf16: true                         # use fp16: true if your GPU has no bf16
 tf32: false
 
 max_grad_norm: 1.0
@@ -112,12 +112,11 @@ weight_decay: 0.01
 # Logging / saving
 # ---------------------------------------------------------------------------
 logging_steps: 10
-eval_steps: 0.1                    # evaluate every 10 % of an epoch
+eval_steps: 0.1                    # evaluate every 10% of an epoch
 save_steps: 0.1
 save_total_limit: 3
 load_best_model_at_end: true
 
-# set to "wandb" or "tensorboard" if desired
 wandb_project: ~
 wandb_run_id: ~
 use_tensorboard: false
@@ -127,14 +126,14 @@ use_tensorboard: false
 # ---------------------------------------------------------------------------
 gradient_checkpointing: true
 flash_attention: false             # set true if flash-attn is installed
-deepspeed: ~                       # add a deepspeed config path for multi-GPU
+deepspeed: ~                       # path to deepspeed config for multi-GPU
 
 # ---------------------------------------------------------------------------
-# Inference / generation defaults (used by axolotl.cli.inference)
+# Inference / generation defaults
 # ---------------------------------------------------------------------------
 inference:
   max_new_tokens: 300
   do_sample: true
   temperature: 0.7
   top_p: 0.9
-  repetition_penalty: 1.15        # prevents repetition loops
+  repetition_penalty: 1.15
