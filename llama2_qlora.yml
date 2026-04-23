@@ -17,7 +17,7 @@ tokenizer_use_fast: false          # Llama-2 works best with the slow tokenizer
 # Dataset
 # ---------------------------------------------------------------------------
 datasets:
-  - path: clean_dataset.json
+  - path: output_qa.json
     type: alpaca                   # use 'sharegpt' if your data has multi-turn
     data_files:
       - clean_dataset.json

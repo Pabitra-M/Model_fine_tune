@@ -17,10 +17,10 @@ tokenizer_use_fast: true           # Falcon works fine with the fast tokenizer
 # Dataset
 # ---------------------------------------------------------------------------
 datasets:
-  - path: clean_dataset.json
+  - path: output_qa.json
     type: alpaca                   # use 'sharegpt' if your data has multi-turn
     data_files:
-      - clean_dataset.json
+      - output_qa.json
     field_instruction: question    # maps your JSON "question" key → instruction
     field_output: answer           # maps your JSON "answer"   key → output
 
